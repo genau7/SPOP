@@ -61,42 +61,45 @@ printSolution (Piramidy above below left right) n a  =
     goes through each cell in a row starting from the first column, then continues to the start of the next row and so on
     returns a filled out Board if one was found -}
 solve :: Piramidy -> Int -> Board ->(Int, Int) -> IO (Maybe Board)
-solve p n a (col, row) | col == n+1 = do piramidsFailed <- edgeConstraintsViolated p n a (col-1,row) -- go to next row              
-                                         if (piramidsFailed)
-                                          then return Nothing
-                                          else solve p n a (1, row+1) 
+solve p n a (col, row) | col == n+1 = do 
+                            piramidsFailed <- edgeConstraintsViolated p n a (col-1,row) -- go to next row              
+                            if (piramidsFailed)
+                               then return Nothing
+                               else solve p n a (1, row+1) 
                                      
                        | row == n+1 = printSolution p n a  >> return (Just a) --reached the last cell (n,n) of the board in the previous iteration
-                       | otherwise = do piramidsFailed <- edgeConstraintsViolated p n a (col-1,row) --check if tcell values are violating edge constraints
-                                        if (piramidsFailed)
-                                         then return Nothing
-                                         else do
-                                            v <- readBoard a (col,row) n
-                                            case v of
-                                                 0 -> availableNums p n a (col,row) >>= solve' p n a (col,row) -- nothing in this cell yet
-                                                 _ ->  solve p n a (col+1,row) --a value is already there, continue to the next cell
+                       | otherwise = do 
+                            piramidsFailed <- edgeConstraintsViolated p n a (col-1,row) --check if tcell values are violating edge constraints
+                            if (piramidsFailed)
+                                then return Nothing
+                                else do v <- readBoard a (col,row) n
+                                        case v of
+                                          0 -> availableNums p n a (col,row) >>= solve' p n a (col,row) -- nothing in this cell yet
+                                          _ ->  solve p n a (col+1,row) --a value is already there, continue to the next cell
                         
-                        -- solve' handles the backtacking
-                        where solve' p n a (col,row) []     = return Nothing
-                              solve' p n a (col,row) (v:vs) = do writeBoard a (col,row) n v -- put a guess onto the board
-                                                                 r <- solve p n a (col+1,row)
-                                                                 if (r == Nothing )
-                                                                    then do   --backtrack
-                                                                       writeBoard a (col,row) n 0  -- remove the guess from the board
-                                                                       solve' p n a (col,row) vs   -- recurse over the remainder of the list
-                                                                    else return r
+                            -- solve' handles the backtacking
+                            where solve' p n a (col,row) []     = return Nothing
+                                  solve' p n a (col,row) (v:vs) = do 
+                                        writeBoard a (col,row) n v -- put a guess onto the board
+                                        r <- solve p n a (col+1,row)
+                                        if (r == Nothing )
+                                            then do   --backtrack
+                                              writeBoard a (col,row) n 0  -- remove the guess from the board
+                                              solve' p n a (col,row) vs   -- recurse over the remainder of the list
+                                            else return r
                                                                 
 edgeConstraintsViolated (Piramidy above below left right) n a (0,row) = do return False -- safe check against array out of bounds exception
-edgeConstraintsViolated (Piramidy above below left right) n a (col,row) = do r <- getRowVals a row n
-                                                                             c <- getColVals a col n
-                                                                             --find all edge constraints for this cell   
-                                                                             let cAbove = above !! (col-1) 
-                                                                                 cBelow = below !! (col-1)
-                                                                                 cLeft  = left  !! (row-1)
-                                                                                 cRight = right !! (row-1) 
-                                                                                 fail = not ((isLineOK cAbove c) && (isLineOK cBelow (reverse c)) 
-                                                                                           && (isLineOK cLeft r) && (isLineOK cRight (reverse r)))  
-                                                                             return (fail)
+edgeConstraintsViolated (Piramidy above below left right) n a (col,row) = do 
+    r <- getRowVals a row n
+    c <- getColVals a col n
+    --find all edge constraints for this cell   
+    let cAbove = above !! (col-1) 
+        cBelow = below !! (col-1)
+        cLeft  = left  !! (row-1)
+        cRight = right !! (row-1) 
+        fail = not ((isLineOK cAbove c) && (isLineOK cBelow (reverse c)) 
+                     && (isLineOK cLeft r) && (isLineOK cRight (reverse r)))  
+    return (fail)
  
 isLineOK (Just constraint) line = (emptyCells line == 0 && numVisiblePiramids line == constraint) || emptyCells line > 0
 isLineOK Nothing _ = True
@@ -120,10 +123,11 @@ availableNums p n a (col,row) = do   r <- getRowVals a row n
 -- get the unavailable numbers from a row, col and depending on height constraints.
 getRowVals a row n = sequence [readBoard a (col',row) n | col' <- [1..n]]
 getColVals a col n = sequence [readBoard a (col,row') n | row' <- [1..n]]
-getAllForbiddenHeights (Piramidy above below left right) n (col,row) =  do return  (forbiddenHeightsForLine (above !! (col-1)) n row
-                                                                                 ++ forbiddenHeightsForLine (below !! (col-1)) n (n-row+1)
-                                                                                 ++ forbiddenHeightsForLine (left !! (row-1)) n col
-                                                                                 ++ forbiddenHeightsForLine (right !! (row-1)) n (n-col+1))
+getAllForbiddenHeights (Piramidy above below left right) n (col,row) =  do 
+    return  (forbiddenHeightsForLine (above !! (col-1)) n row
+          ++ forbiddenHeightsForLine (below !! (col-1)) n (n-row+1)
+          ++ forbiddenHeightsForLine (left !! (row-1)) n col
+          ++ forbiddenHeightsForLine (right !! (row-1)) n (n-col+1))
 
 --return a list of values forbidden by edge constraints depending on cell position                                                                               --
 forbiddenHeightsForLine Nothing _ _ = []
@@ -131,7 +135,7 @@ forbiddenHeightsForLine (Just 1) n index | index==1 = [1..n] \\ [n]
                                          | otherwise = [n]
                                          
 forbiddenHeightsForLine (Just constraint) n index | constraint == n = ([1..n] \\ [index])
-                                                    | otherwise = [1..n] \\ [1..index+n-constraint]
+                                                  | otherwise = [1..n] \\ [1..index+n-constraint]
     
 --The board has cells numbered form (1,1) to (n,n)    
 readBoard a (col,row) n = readArray a (col+n*(row-1))
