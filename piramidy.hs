@@ -67,18 +67,23 @@ solve p n a (col, row) | col == n+1 = do
                                then return Nothing
                                else solve p n a (1, row+1) 
                                      
-                       | row == n+1 = printSolution p n a  >> return (Just a) --reached the last cell (n,n) of the board in the previous iteration
+                       | row == n+1 = printSolution p n a  >> return (Just a) -- reached the last cell (n,n) of the board in the previous iteration
                        | otherwise = do 
-                            piramidsFailed <- edgeConstraintsViolated p n a (col-1,row) --check if tcell values are violating edge constraints
-                            if (piramidsFailed)
-                                then return Nothing
-                                else do v <- readBoard a (col,row) n
-                                        case v of
-                                          0 -> availableNums p n a (col,row) >>= solve' p n a (col,row) -- nothing in this cell yet
-                                          _ ->  solve p n a (col+1,row) --a value is already there, continue to the next cell
-                        
+                            if (row == n && col > 1) -- reached the last row and column other than 1
+                                then do
+                                    piramidsFailed <- edgeConstraintsViolated p n a (col-1,row) --check if tcell values are violating edge constraints
+                                    if (piramidsFailed)
+                                        then return Nothing
+                                        else findVal
+                                else findVal
+                                
                             -- solve' handles the backtacking
-                            where solve' p n a (col,row) []     = return Nothing
+                            where findVal = do v <- readBoard a (col,row) n
+                                               case v of
+                                                    0 -> availableNums p n a (col,row) >>= solve' p n a (col,row) -- nothing in this cell yet
+                                                    _ ->  solve p n a (col+1,row) --a value is already there, continue to the next cell
+                            
+                                  solve' p n a (col,row) []     = return Nothing
                                   solve' p n a (col,row) (v:vs) = do 
                                         writeBoard a (col,row) n v -- put a guess onto the board
                                         r <- solve p n a (col+1,row)
